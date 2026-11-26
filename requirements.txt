@@ -1,0 +1,7 @@
+# Core runtime (already provided by ComfyUI; listed for standalone/test use)
+torch>=2.1.0
+safetensors>=0.4.0
+
+# Optional: only required by H3 Smart Split / H3 Smart Split v2 scene detection.
+# Missing this package does NOT affect plugin loading or other nodes.
+scenedetect>=0.6.4,<0.8

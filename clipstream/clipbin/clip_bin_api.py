@@ -1,0 +1,532 @@
+"""HTTP API endpoints for MiniMax H3 Clip Bin web frontend integration."""
+
+import os
+import asyncio
+from .asset_paths import preview_url
+import json
+import logging
+from urllib.parse import urlsplit
+from typing import Dict, Any, List
+
+logger = logging.getLogger("minimax_clip_bin_api")
+
+try:
+    import folder_paths
+except ImportError:
+    folder_paths = None
+
+from .clip_bin_manager import (
+    get_project_dir,
+    existing_project_dir,
+    create_project,
+    delete_project,
+    rename_project,
+    project_locked,
+    delete_clip_asset,
+    atomic_write_json,
+    list_projects,
+    load_project_index,
+    filter_clips_by_kind,
+    save_project_index,
+    rebuild_project_index,
+    probe_video_duration,
+    VIDEO_EXTENSIONS,
+    resolve_source_video_path,
+)
+# The Builder panel shows the resolution and duration of the video it would actually
+# join, so it borrows the same variant choice and the same ffprobe reader the node
+# uses. long_builder only depends on clip_bin_manager, so this stays one-way.
+from .long_builder import (
+    cached_video_probe,
+    pick_variant,
+    probe_video_streams,
+)
+
+from .local_folder import open_local_folder
+
+
+def _probe_and_fix_durations(project_name: str, clip_id: str, entry: Dict[str, Any], clip_dir: str) -> bool:
+    """Lazily measures real video durations for clips saved before probing existed.
+
+    Only probes entries whose duration_source is not yet 'probed'; the result is
+    cached back into meta.json + index so each clip pays this cost exactly once."""
+    fixed = False
+    if not entry.get("variants"):
+        vf = str(entry.get("video_file") or "")
+        if vf and os.path.isfile(os.path.join(clip_dir, vf)) and entry.get("duration_source") != "probed":
+            d = probe_video_duration(os.path.join(clip_dir, vf))
+            if d is not None:
+                entry["duration_seconds"] = round(d, 2)
+                entry["duration_source"] = "probed"
+                fixed = True
+    else:
+        for v in (entry.get("variants") or {}).values():
+            if not isinstance(v, dict) or not v.get("has_latent"):
+                continue
+            vf = str(v.get("video_file") or "")
+            if vf and os.path.isfile(os.path.join(clip_dir, vf)) and v.get("duration_source") != "probed":
+                d = probe_video_duration(os.path.join(clip_dir, vf))
+                if d is not None:
+                    v["duration_seconds"] = round(d, 2)
+                    v["duration_source"] = "probed"
+                    fixed = True
+    return fixed
+
+
+# Measured stream parameters are cached inside the card under "video_probe"; the flat
+# video_* fields below are that cache re-exported for the front end and are never
+# written back into meta.json.
+_FRONTEND_ONLY_KEYS = {"thumbnail_file", "subfolder", "thumbnail_url", "video_url",
+                      "video_width", "video_height", "video_fps", "video_frames",
+                      "video_duration_seconds"}
+
+VIDEO_PROBE_KEY = "video_probe"
+
+
+def _video_probe_fields(clip_dir: str, video_file: str, entry: Dict[str, Any],
+                        probe=None):
+    """Returns (display fields, whether a new measurement was taken) for one video.
+
+    A card records what it generated, not what the archived MP4 really is, so the
+    resolution and duration the Builder shows have to be measured. ffprobe runs once
+    per file and the result is cached in the card, keyed by file name plus size and
+    mtime, so a re-encode or a replaced file is measured again while a normal list
+    call costs nothing. An unreadable file yields zeros and caches nothing, so the
+    next request retries.
+
+    ``probe`` is injectable and the module attribute is read at call time, so a test
+    can replace clip_bin_api.probe_video_streams and drive this code unchanged.
+    """
+    probe = probe or probe_video_streams
+    empty = {"video_width": 0, "video_height": 0, "video_fps": 0.0,
+             "video_frames": 0, "video_duration_seconds": 0.0}
+    name = str(video_file or "")
+    path = os.path.join(clip_dir, name)
+    if not name or not os.path.isfile(path):
+        return empty, False
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return empty, False
+
+    cached = cached_video_probe(path, name, entry)
+    if cached is not None:
+        return {
+            "video_width": int(cached.get("width") or 0),
+            "video_height": int(cached.get("height") or 0),
+            "video_fps": float(cached.get("fps") or 0.0),
+            "video_frames": int(cached.get("frames") or 0),
+            "video_duration_seconds": float(cached.get("duration") or 0.0),
+        }, False
+
+    measured = probe(path)
+    if not measured:
+        return empty, False
+    record = {
+        "file": name,
+        "size": int(stat.st_size),
+        "mtime": int(stat.st_mtime),
+        "width": int(measured.get("width") or 0),
+        "height": int(measured.get("height") or 0),
+        "fps": round(float(measured.get("fps") or 0.0), 3),
+        "frames": int(measured.get("frames") or 0),
+        "duration": round(float(measured.get("duration") or 0.0), 3),
+        "frames_estimated": bool(measured.get("frames_estimated")),
+        "has_audio": bool(measured.get("has_audio")),
+        "sample_rate": int(measured.get("sample_rate") or 0),
+        "vcodec": str(measured.get("vcodec") or ""),
+        "acodec": str(measured.get("acodec") or ""),
+    }
+    entry[VIDEO_PROBE_KEY] = record
+    return {
+        "video_width": record["width"],
+        "video_height": record["height"],
+        "video_fps": record["fps"],
+        "video_frames": record["frames"],
+        "video_duration_seconds": record["duration"],
+    }, True
+
+
+def _persist_clip_entry(project_name: str, clip_id: str, entry: Dict[str, Any]) -> None:
+    """Writes corrected fields back into both the project index and meta.json."""
+    clean = {k: v for k, v in entry.items() if k not in _FRONTEND_ONLY_KEYS}
+    idx = load_project_index(project_name)
+    replaced = False
+    clips = []
+    for c in idx.get("clips", []):
+        if c.get("clip_id") == clip_id:
+            merged = dict(c)
+            merged.update(clean)
+            clips.append(merged)
+            replaced = True
+        else:
+            clips.append(c)
+    if not replaced:
+        return
+    idx["clips"] = clips
+    save_project_index(project_name, idx)
+
+    meta_path = os.path.join(get_project_dir(project_name), clip_id, "meta.json")
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            meta.update(clean)
+            atomic_write_json(meta_path, meta)
+        except Exception as e:
+            logger.warning("[Clip Bin API] Failed to persist probed duration for '%s': %s", clip_id, e)
+
+@project_locked
+def get_project_clips_api(project_name: str, variant_policy: str = "",
+                        want_probe: bool = False, asset_kind: str = "") -> Dict[str, Any]:
+    """Retrieves full clip metadata and relative thumbnail paths for the frontend.
+
+    ``variant_policy`` is optional: when the Long Builder passes its own policy, each
+    card reports the video that policy would pick, so the numbers on the card are the
+    numbers that end up in the film. The Pickers leave it empty and keep the old
+    behaviour.
+
+    ``want_probe`` is only true for the Long Builder, which shows resolution and
+    duration on its cards. The Pickers do not display those fields and already pay a
+    duration probe per card above, so they ask for no measurement at all.
+    """
+    p_name = (project_name or "Default_Project").strip()
+    idx = load_project_index(p_name)
+    clips = filter_clips_by_kind(p_name, idx.get("clips", []), asset_kind)
+
+    base_dir = folder_paths.get_output_directory() if folder_paths is not None else "output"
+    project_dir = get_project_dir(p_name)
+
+    enriched_clips = []
+    for c in clips:
+        clip_id = c.get("clip_id", "")
+        clip_dir = os.path.join(project_dir, clip_id)
+
+        # Determine relative subfolder for ComfyUI /view API
+        try:
+            subfolder = os.path.relpath(clip_dir, base_dir)
+        except Exception:
+            subfolder = os.path.join("h3-clipstream", p_name, clip_id)
+
+        # Check existing preview files
+        tail_path = os.path.join(clip_dir, "tail_frame.png")
+        first_path = os.path.join(clip_dir, "first_frame.png")
+        preview_path = os.path.join(clip_dir, "preview.png")
+
+        preview_file = "preview.png" if os.path.isfile(preview_path) else (
+            "tail_frame.png" if os.path.isfile(tail_path) else (
+                "first_frame.png" if os.path.isfile(first_path) else ""
+            )
+        )
+
+        # Check existing video file (must have valid video extension)
+        video_file = c.get("video_file", "")
+        if not video_file or not any(video_file.lower().endswith(e) for e in VIDEO_EXTENSIONS) or not os.path.isfile(os.path.join(clip_dir, video_file)):
+            video_file = ""
+            for v_cand in ["video.mp4", "video.webm"]:
+                if os.path.isfile(os.path.join(clip_dir, v_cand)):
+                    video_file = v_cand
+                    break
+            if not video_file and os.path.isdir(clip_dir):
+                for fn in os.listdir(clip_dir):
+                    if any(fn.lower().endswith(e) for e in VIDEO_EXTENSIONS):
+                        video_file = fn
+                        break
+
+            # Auto-repair from associated_video_path if found in output
+            if not video_file and c.get("associated_video_path"):
+                src_v = resolve_source_video_path(c.get("associated_video_path"))
+                if src_v and os.path.isfile(src_v):
+                    ext = os.path.splitext(src_v)[1].lower()
+                    if ext in VIDEO_EXTENSIONS:
+                        dest_v = os.path.join(clip_dir, f"video{ext}")
+                        try:
+                            import shutil
+                            shutil.copy2(src_v, dest_v)
+                            video_file = f"video{ext}"
+                            # Also delete bogus video.png if present
+                            bogus = os.path.join(clip_dir, "video.png")
+                            if os.path.isfile(bogus):
+                                os.remove(bogus)
+                        except Exception:
+                            pass
+
+        has_video = bool(video_file and os.path.isfile(os.path.join(clip_dir, video_file)))
+        video_url = preview_url(os.path.join(clip_dir, video_file), subfolder) if has_video else ""
+
+        # Self-heal: measure real durations for clips saved before probing existed (one-time per clip)
+        if _probe_and_fix_durations(p_name, clip_id, c, clip_dir):
+            _persist_clip_entry(p_name, clip_id, c)
+
+        enriched = dict(c)
+        enriched["thumbnail_file"] = preview_file
+        enriched["subfolder"] = subfolder
+        enriched["thumbnail_url"] = preview_url(os.path.join(clip_dir, preview_file), subfolder) if preview_file else ""
+        enriched["has_video"] = has_video
+        enriched["video_file"] = video_file if has_video else ""
+        enriched["video_url"] = video_url
+
+        if want_probe:
+            # Real stream parameters of the file that would be joined, measured once.
+            joined_file = video_file
+            if variant_policy:
+                _variant, chosen, _variant_meta = pick_variant(c, variant_policy)
+                if chosen and os.path.isfile(os.path.join(clip_dir, chosen)):
+                    joined_file = chosen
+            fields, measured_now = _video_probe_fields(clip_dir, joined_file, c)
+            if measured_now:
+                _persist_clip_entry(p_name, clip_id, c)
+            enriched.update(fields)
+        enriched_clips.append(enriched)
+
+    return {
+        "project_name": p_name,
+        "total_clips": len(enriched_clips),
+        "available_projects": list_projects(),
+        "clips": enriched_clips,
+    }
+
+
+def _card_has_video(project_dir: str, clip_id: str, entry: Dict[str, Any]) -> bool:
+    """Checks whether a card really has an archived video file on disk.
+
+    Mirrors the list endpoint's lookup without its self-healing copy: the project
+    picker only has to decide whether a bin is worth offering at all.
+    """
+    clip_dir = os.path.join(project_dir, str(clip_id))
+    candidates = [str(entry.get("video_file") or "")]
+    variants = entry.get("variants")
+    if isinstance(variants, dict):
+        for variant in variants.values():
+            if isinstance(variant, dict):
+                candidates.append(str(variant.get("video_file") or ""))
+    for name in candidates:
+        if name and any(name.lower().endswith(e) for e in VIDEO_EXTENSIONS) \
+                and os.path.isfile(os.path.join(clip_dir, name)):
+            return True
+    if os.path.isdir(clip_dir):
+        for file_name in os.listdir(clip_dir):
+            if any(file_name.lower().endswith(e) for e in VIDEO_EXTENSIONS):
+                return True
+    return False
+
+
+def _project_cover_url(project_dir: str, project_name: str, cards: List[Dict[str, Any]]) -> str:
+    """The thumbnail of the first saved card, used as the cover in the project menu.
+
+    The menu shows one picture per project so a bin can be recognised without reading
+    its name. Only the paths the list endpoint already resolves are checked here, and
+    the first card with a preview wins; a bin whose cards were saved before previews
+    existed simply has no cover and the menu draws its icon instead.
+    """
+    base_dir = folder_paths.get_output_directory() if folder_paths is not None else "output"
+    for card in cards:
+        clip_id = str(card.get("clip_id") or "")
+        if not clip_id:
+            continue
+        clip_dir = os.path.join(project_dir, clip_id)
+        for file_name in ("preview.png", "tail_frame.png", "first_frame.png"):
+            path = os.path.join(clip_dir, file_name)
+            if os.path.isfile(path):
+                try:
+                    subfolder = os.path.relpath(clip_dir, base_dir)
+                except Exception:
+                    subfolder = os.path.join("h3-clipstream", project_name, clip_id)
+                return preview_url(path, subfolder)
+    return ""
+
+
+def list_projects_api(videos_only: bool = False, asset_kind: str = "") -> Dict[str, Any]:
+    """Lists project bins with their card and archived-video counts.
+
+    Scoped Picker menus only offer bins containing their corresponding card type.
+    The unscoped list retains empty bins; Long Builder uses ``videos_only``.
+
+    ``updated_at`` and ``cover_url`` are what the card menu draws on each project; the
+    cards themselves live in the index the counts already come from.
+    """
+    projects = []
+    for name in list_projects():
+        index = load_project_index(name)
+        cards = [c for c in index.get("clips", []) if isinstance(c, dict) and c.get("clip_id")]
+        total_cards = len(cards)
+        cards = filter_clips_by_kind(name, cards, asset_kind)
+        if asset_kind and not cards:
+            continue
+        project_dir = get_project_dir(name)
+        videos = sum(1 for c in cards
+                     if _card_has_video(project_dir, c.get("clip_id"), c))
+        if videos_only and not videos:
+            continue
+        projects.append({
+            "name": name,
+            "clips": len(cards),
+            "total_clips": total_cards,
+            "videos": videos,
+            "updated_at": str(index.get("last_updated") or ""),
+            "cover_url": _project_cover_url(project_dir, name, cards),
+        })
+    return {"projects": projects}
+
+
+def _csrf_block(request):
+    """Rejects a mutating request that is not same-origin; ComfyUI has no CSRF gate."""
+    origin = request.headers.get("Origin") or request.headers.get("Referer", "")
+    if (request.headers.get("Sec-Fetch-Site") == "cross-site" or
+            not origin or urlsplit(origin).netloc.lower() != request.host.lower()):
+        return web.json_response({"error": "Only same-origin requests are allowed"}, status=403)
+    return None
+
+def register_clip_bin_routes() -> None:
+    """Registers API routes into ComfyUI's PromptServer if running inside ComfyUI."""
+    try:
+        import server
+        from aiohttp import web
+    except ImportError:
+        logger.debug("[Clip Bin API] ComfyUI server or aiohttp not available. Skipping route registration.")
+        return
+
+    prompt_server = getattr(server.PromptServer, "instance", None)
+    if prompt_server is None or not hasattr(prompt_server, "routes"):
+        logger.debug("[Clip Bin API] PromptServer routes not found.")
+        return
+
+    routes = prompt_server.routes
+
+    @routes.get("/minimax/clip_bin/list")
+    async def handle_list_clips(request):
+        project = request.rel_url.query.get("project", "Default_Project")
+        variant_policy = request.rel_url.query.get("variant_policy", "")
+        want_probe = request.rel_url.query.get("probe", "").strip().lower() in ("1", "true", "yes")
+        asset_kind = request.rel_url.query.get("asset_kind", "")
+        if asset_kind not in ("", "single", "dual"):
+            raise web.HTTPBadRequest(text="asset_kind must be single or dual")
+        data = await asyncio.to_thread(get_project_clips_api, project, variant_policy, want_probe, asset_kind)
+        return web.json_response(data, headers={"Cache-Control": "no-store"})
+
+
+    @routes.get("/minimax/clip_bin/projects")
+    async def handle_projects(request):
+        videos_only = (request.rel_url.query.get("videos_only") or "").lower() in ("1", "true", "yes")
+        asset_kind = request.rel_url.query.get("asset_kind", "")
+        if asset_kind not in ("", "single", "dual"):
+            raise web.HTTPBadRequest(text="asset_kind must be single or dual")
+        data = await asyncio.to_thread(list_projects_api, videos_only, asset_kind)
+        return web.json_response(data, headers={"Cache-Control": "no-store"})
+
+    @routes.post("/minimax/clip_bin/project")
+    async def handle_create_project(request):
+        blocked = _csrf_block(request)
+        if blocked is not None:
+            return blocked
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected JSON"}, status=415)
+        try:
+            body = await request.json()
+            typed = body.get("project") if isinstance(body, dict) else None
+            result = await asyncio.to_thread(create_project, typed)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except (TypeError, KeyError):
+            return web.json_response({"error": "Invalid project name"}, status=400)
+        except OSError:
+            logger.exception("Failed to create project bin")
+            return web.json_response({"error": "建立失败：没有写入权限或文件夹被占用，请关闭预览后重试。"}, status=409)
+        return web.json_response(result, headers={"Cache-Control": "no-store"})
+
+    @routes.post("/minimax/clip_bin/project/rename")
+    async def handle_rename_project(request):
+        blocked = _csrf_block(request)
+        if blocked is not None:
+            return blocked
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected JSON"}, status=415)
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("Expected an object")
+            result = await asyncio.to_thread(
+                rename_project, body.get("project"), body.get("new_name"))
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except (TypeError, KeyError):
+            return web.json_response({"error": "Invalid project name"}, status=400)
+        except OSError:
+            logger.exception("Failed to rename project bin")
+            return web.json_response({"error": "重命名失败：文件夹可能正被预览占用，请关闭预览后重试。"}, status=409)
+        return web.json_response(result, headers={"Cache-Control": "no-store"})
+
+    @routes.post("/minimax/clip_bin/project/delete")
+    async def handle_delete_project(request):
+        blocked = _csrf_block(request)
+        if blocked is not None:
+            return blocked
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected JSON"}, status=415)
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("Expected an object")
+            result = await asyncio.to_thread(delete_project, body.get("project"), body.get("confirm"))
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except (TypeError, KeyError):
+            return web.json_response({"error": "Invalid project name"}, status=400)
+        except OSError:
+            logger.exception("Failed to delete project bin")
+            return web.json_response({"error": "删除失败：文件夹可能正被预览占用，请关闭预览后重试。"}, status=409)
+        if not result["deleted"]:
+            return web.json_response({"error": "项目已不存在，请刷新列表。"}, status=404)
+        return web.json_response(result, headers={"Cache-Control": "no-store"})
+
+    @routes.post("/minimax/clip_bin/project/open")
+    async def handle_open_project(request):
+        """Open one existing project folder on the ComfyUI host."""
+        blocked = _csrf_block(request)
+        if blocked is not None:
+            return blocked
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected JSON"}, status=415)
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("Expected an object")
+            folder = await asyncio.to_thread(existing_project_dir, body.get("project"))
+            await asyncio.to_thread(open_local_folder, folder)
+        except FileNotFoundError as exc:
+            return web.json_response({"error": str(exc)}, status=404)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except (TypeError, KeyError):
+            return web.json_response({"error": "Invalid project name"}, status=400)
+        except RuntimeError as exc:
+            return web.json_response({"error": str(exc)}, status=501)
+        except OSError:
+            logger.exception("Failed to open project bin folder")
+            return web.json_response({"error": "打开目录失败：没有权限或资源管理器没有响应。"}, status=409)
+        return web.json_response({"opened": True}, headers={"Cache-Control": "no-store"})
+
+    @routes.post("/minimax/clip_bin/delete")
+    async def handle_delete(request):
+        blocked = _csrf_block(request)
+        if blocked is not None:
+            return blocked
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected JSON"}, status=415)
+        try:
+            body = await request.json()
+            if not isinstance(body, dict) or not isinstance(body.get("project"), str) or not body["project"].strip():
+                raise ValueError("A project name is required")
+            project, asset_id = body["project"], body["clip_id"]
+            removed = await asyncio.to_thread(delete_clip_asset, project, asset_id)
+        except (ValueError, TypeError, KeyError):
+            return web.json_response({"error": "Invalid project or clip_id"}, status=400)
+        except OSError:
+            logger.exception("Failed to delete saved asset")
+            return web.json_response({"error": "删除失败：文件可能被占用或没有写入权限，请关闭预览后重试。"}, status=409)
+        if not removed:
+            return web.json_response({"error": "片段已不存在，请刷新列表。"}, status=404)
+        prompt_server.send_sync("minimax/clip_bin/changed", {"project": project, "deleted_id": asset_id})
+        return web.json_response({"deleted": asset_id})
+
+    logger.info("[Clip Bin API] Successfully registered /minimax/clip_bin routes with PromptServer.")

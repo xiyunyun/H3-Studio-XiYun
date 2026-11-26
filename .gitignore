@@ -1,0 +1,67 @@
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments & local tools
+.venv/
+venv/
+env/
+node_modules/
+
+# IDE & OS metadata
+.vscode/
+.idea/
+.cursor/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.tmp
+*.bak
+*.log
+
+# Local tests, probes & scratch directories
+.tmp_tests/
+**/.tmp_tests/
+.tmp_run/
+.tmp_run*/
+.probe_dir/
+.probe*/
+probe_mk*/
+mk_*/
+scratch/
+archive/
+
+# Model weights, safetensors & media binaries (keep repo lightweight)
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+weights/
+lvm/weights/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+
+# ComfyUI local runtime directories if created inside plugin root
+input/
+output/
+temp/

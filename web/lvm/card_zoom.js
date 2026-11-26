@@ -1,0 +1,69 @@
+// RAFOLIE 2026-10-03: card zoom shared by the Segment Picker and the Manager panel.
+// One control, one set of steps, so both panels scale cards the same way (50%-400%).
+// The sizes are CSS custom properties on the panel container; the deck grid and the
+// thumbnail box read them, so nothing here touches the node size - ComfyUI owns that.
+
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4]; // 50%, 75%, 100%, 150%, 200%, 300%, 400%
+const BASE_CARD_MIN = 130; // px, the picker default
+const BASE_THUMB_H = 75;   // px
+// A guide card carries two number fields and a row of buttons, so it starts bigger.
+// The caller passes its own base; the steps and the control stay the same everywhere.
+
+export function createCardZoom({ container, node, baseCardMin = BASE_CARD_MIN, baseThumbH = BASE_THUMB_H }) {
+    let stepIndex = ZOOM_STEPS.indexOf(1);
+
+    const sep = document.createElement("span");
+    sep.className = "h3lvm-tool-sep";
+
+    const label = document.createElement("span");
+    label.className = "h3lvm-tool-label";
+    label.textContent = "卡片大小";
+
+    const percent = document.createElement("span");
+    percent.className = "h3lvm-zoom-label";
+
+    const zoomOut = document.createElement("button");
+    zoomOut.className = "h3lvm-refresh-btn";
+    zoomOut.textContent = "−";
+    zoomOut.title = "缩小卡片";
+
+    const zoomIn = document.createElement("button");
+    zoomIn.className = "h3lvm-refresh-btn";
+    zoomIn.textContent = "+";
+    zoomIn.title = "放大卡片";
+
+    function apply() {
+        const zoom = ZOOM_STEPS[stepIndex];
+        container.style.setProperty("--card-min", Math.round(baseCardMin * zoom) + "px");
+        container.style.setProperty("--thumb-h", Math.round(baseThumbH * zoom) + "px");
+        container.classList.toggle("h3lvm-zoom-compact", zoom < 1);
+        container.classList.toggle("h3lvm-zoom-tiny", zoom <= 0.5);
+        percent.textContent = Math.round(zoom * 100) + "%";
+        zoomOut.disabled = stepIndex === 0;
+        zoomIn.disabled = stepIndex === ZOOM_STEPS.length - 1;
+        node?.setDirtyCanvas?.(true, true);
+    }
+
+    zoomIn.onclick = (event) => {
+        event.stopPropagation();
+        if (stepIndex < ZOOM_STEPS.length - 1) {
+            stepIndex++;
+            apply();
+        }
+    };
+    zoomOut.onclick = (event) => {
+        event.stopPropagation();
+        if (stepIndex > 0) {
+            stepIndex--;
+            apply();
+        }
+    };
+
+    apply();
+
+    return {
+        mount(toolbar) {
+            toolbar.append(sep, label, zoomOut, percent, zoomIn);
+        },
+    };
+}

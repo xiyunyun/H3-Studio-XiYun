@@ -1,0 +1,465 @@
+// RAFOLIE 2026-10-09: the card deck shared by the Manager and the Smart Split panel.
+//
+// Both nodes write into the SAME project bin, so both show the same deck: every
+// segment in the bin in segment order, with the ones from this node's last run
+// marked 本次. Clicking a card sets 输出片段编号. One implementation on purpose -
+// a second copy of this code is how two panels start to look different.
+//
+// The deck belongs to the bin, not to the node that filled it: a bin written by the
+// Manager shows the same cards in the Smart Split panel and vice versa.
+//
+// No new node inputs and no new saved workflow fields.
+
+import { api } from "../../../scripts/api.js";
+import { openPreview } from "./preview_overlay.js";
+import { appendThumbnail } from "./thumb_fit.js";
+import { createCardZoom } from "./card_zoom.js";
+import { addDeleteButton } from "./delete_button.js";
+import { fetchJsonShared } from "./json_request.js";
+import { adjacentSelection, toggleMergeSelection } from "./deck_selection.js";
+
+export function createDeck({
+    node,
+    signal,
+    container,
+    projectField = "project_name",
+    segmentField = "segment_id",
+    toolLabel = "🎬 素材库",
+    emptyText = "这个素材库还没有片段。运行本节点即可写入。",
+    footerLines = [],
+    onRefresh = null,
+}) {
+    // --- Tool row: reload, card size, and what this bin holds ---
+    const toolbar = document.createElement("div");
+    toolbar.className = "h3lvm-toolbar h3-tool-card";
+
+    const refreshBtn = document.createElement("button");
+    refreshBtn.className = "h3lvm-refresh-btn";
+    refreshBtn.textContent = "🔄 刷新";
+    refreshBtn.title = "重新读取当前项目的片段列表";
+
+    // Merge mode: pick adjacent cards, then join them into one segment. It uses
+    // the same button shell as 刷新 so the tool row stays exactly one line tall.
+    const mergeBtn = document.createElement("button");
+    mergeBtn.className = "h3lvm-refresh-btn h3lvm-merge-btn";
+    mergeBtn.textContent = "🔗 合并模式";
+    mergeBtn.title = "点选相邻的卡片，再把它们合并成一个片段";
+
+    const mergeOkBtn = document.createElement("button");
+    mergeOkBtn.className = "h3lvm-refresh-btn h3lvm-merge-ok";
+    mergeOkBtn.textContent = "✅ 确认合并";
+    mergeOkBtn.title = "把选中的相邻片段合并成一个片段，编号沿用其中最小的一个";
+    mergeOkBtn.disabled = true;
+    mergeOkBtn.style.display = "none";
+
+    const toolSep = document.createElement("span");
+    toolSep.className = "h3lvm-tool-sep";
+
+    const toolText = document.createElement("span");
+    toolText.className = "h3lvm-tool-label";
+    toolText.textContent = toolLabel;
+
+    const runText = document.createElement("span");
+    runText.className = "h3lvm-status";
+    runText.textContent = "读取中…";
+
+    const spacer = document.createElement("span");
+    spacer.className = "h3lvm-spacer";
+
+    toolbar.append(refreshBtn, mergeBtn, mergeOkBtn);
+    createCardZoom({ container, node }).mount(toolbar);
+    toolbar.append(toolSep, toolText, runText, spacer);
+    container.appendChild(toolbar);
+
+    // --- Card grid ---
+    const deck = document.createElement("div");
+    deck.className = "h3lvm-deck";
+    container.appendChild(deck);
+
+    // --- Footer legend (caller decides the wording) ---
+    const footer = document.createElement("div");
+    footer.className = "h3lvm-footer";
+    for (const line of footerLines) {
+        const hint = document.createElement("span");
+        hint.className = "h3lvm-hint";
+        hint.textContent = line;
+        footer.appendChild(hint);
+    }
+    container.appendChild(footer);
+
+    // Which ids this node produced in its last run; used for a badge, not for
+    // filtering the deck.
+    let runIds = new Set();
+    // Merge mode is a UI mode, not a saved field: leaving the page drops it.
+    let mergeMode = false;
+    let picked = new Set();
+    let merging = false;
+    let deleting = false;
+    let segmentCount = 0;
+    let availableIds = [];
+    let rendering = false;
+    let pendingRender = false;
+    let deletedBeforeRender = new Set();
+    let renderedDeckKey = "";
+    // Set by the project menu when the user changes bins: the old selection belongs
+    // to another bin, so that bin's next render starts at its first card.
+    let selectFirstProject = null;
+
+    function selectFirstSegment(project) {
+        selectFirstProject = project;
+    }
+
+    function widgetFor(name) {
+        return node.widgets?.find(item => item.name === name);
+    }
+
+    function currentProject() {
+        const raw = widgetFor(projectField)?.value;
+        return typeof raw === "string" ? raw.trim() : "";
+    }
+
+    function selectedSegment() {
+        return Number(widgetFor(segmentField)?.value);
+    }
+
+    refreshBtn.onclick = (event) => {
+        event.stopPropagation();
+        if (onRefresh) {
+            try {
+                onRefresh();
+            } catch (error) {
+                console.warn("[H3 LVM] deck refresh hook failed:", error);
+            }
+        }
+        void render();
+    };
+
+    function pickedIds() {
+        return [...picked].sort((a, b) => a - b);
+    }
+
+    // Button state only; the status line is written by the callers that know why.
+    function updateMergeUi() {
+        const busy = merging || deleting;
+        mergeBtn.classList.toggle("on", mergeMode);
+        mergeBtn.disabled = busy || segmentCount < 2;
+        mergeOkBtn.style.display = mergeMode ? "" : "none";
+        mergeOkBtn.disabled = !(mergeMode && picked.size >= 2 && !busy && adjacentSelection(picked, availableIds));
+        mergeOkBtn.textContent = merging ? "⏳ 合并中…" : "✅ 确认合并";
+        deck.querySelectorAll(".h3-asset-delete").forEach(button => {
+            button.disabled = mergeMode || busy;
+        });
+    }
+
+    function setMergeMode(on) {
+        if (on && (merging || deleting || segmentCount < 2)) return;
+        mergeMode = on;
+        if (!on) picked.clear();
+        updateMergeUi();
+        deck.querySelectorAll(".h3lvm-card.picked").forEach(item => item.classList.remove("picked"));
+    }
+
+    function togglePick(id) {
+        picked = toggleMergeSelection(picked, id, availableIds);
+        deck.querySelectorAll(".h3lvm-card").forEach(item => {
+            item.classList.toggle("picked", picked.has(Number(item.dataset.segId)));
+        });
+        updateMergeUi();
+        updateStatus(picked.size
+            ? `合并模式：已选 ${picked.size} 段（片段 ${formatIds(pickedIds())}）`
+            : "合并模式：请点选相邻的卡片（至少两段）");
+    }
+
+    mergeBtn.onclick = (event) => {
+        event.stopPropagation();
+        setMergeMode(!mergeMode);
+        updateStatus(mergeMode
+            ? "合并模式：点选相邻卡片后按「确认合并」"
+            : "已退出合并模式");
+    };
+
+    mergeOkBtn.onclick = async (event) => {
+        event.stopPropagation();
+        const ids = pickedIds();
+        const project = currentProject();
+        if (ids.length < 2 || !project || merging || deleting || !adjacentSelection(picked, availableIds)) return;
+        merging = true;
+        updateMergeUi();
+        try {
+            const res = await api.fetchApi("/h3_lvm/merge", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project, segment_ids: ids }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                updateStatus("合并失败：" + (data.error || res.status));
+                return;
+            }
+            // 输出片段编号 must keep pointing at something that still exists:
+            // a merged id follows the merge, a later id follows the renumbering.
+            const widget = widgetFor(segmentField);
+            const current = selectedSegment();
+            if (widget && Number.isFinite(current)) {
+                let next = current;
+                if (current >= ids[0] && current <= ids[ids.length - 1]) next = ids[0];
+                else if (current > ids[ids.length - 1]) next = current - (ids.length - 1);
+                if (next !== current) {
+                    widget.value = next;
+                    widget.callback?.(next);
+                }
+            }
+            setMergeMode(false);
+            updateStatus(`已合并片段 ${formatIds(ids)} → 片段 ${data.merged_id}（去掉 ${data.dropped_overlap_frames || 0} 帧重叠）`);
+            void render();
+        } catch (error) {
+            updateStatus("合并失败：" + (error?.message || error));
+        } finally {
+            merging = false;
+            updateMergeUi();
+        }
+    };
+
+    async function deleteCard(project, segmentId) {
+        if (merging || deleting || mergeMode) return;
+        deleting = true;
+        updateMergeUi();
+        try {
+            document.getElementById("h3lvm-preview-overlay")?._h3Close?.();
+            const response = await api.fetchApi("/h3_lvm/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project, segment_id: segmentId }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || `删除失败 (${response.status})；请确认已重启 ComfyUI。`);
+            }
+            if (!signal.aborted && currentProject() === project) {
+                await render(segmentId);
+                updateStatus(`已删除片段 ${segmentId}`);
+            }
+        } finally {
+            deleting = false;
+            updateMergeUi();
+        }
+    }
+
+    function formatIds(ids) {
+        const sorted = [...ids].sort((a, b) => a - b);
+        const parts = [];
+        let index = 0;
+        while (index < sorted.length) {
+            let last = index;
+            while (last + 1 < sorted.length && sorted[last + 1] === sorted[last] + 1) last++;
+            parts.push(index === last ? String(sorted[index]) : sorted[index] + "–" + sorted[last]);
+            index = last + 1;
+        }
+        return parts.join(", ");
+    }
+
+    function updateStatus(text) {
+        runText.textContent = text;
+    }
+
+    async function render(deletedId = null) {
+        if (deletedId != null && Number.isFinite(Number(deletedId))) deletedBeforeRender.add(Number(deletedId));
+        // Two triggers can land at once (a run plus a project switch); one redraw
+        // at a time keeps the last one authoritative.
+        if (rendering) {
+            pendingRender = true;
+            return;
+        }
+        rendering = true;
+        try {
+            do {
+                pendingRender = false;
+                const deletedIds = deletedBeforeRender;
+                deletedBeforeRender = new Set();
+                await renderOnce(deletedIds);
+            } while (pendingRender && !signal.aborted);
+        } finally {
+            rendering = false;
+        }
+    }
+
+    async function renderOnce(deletedIds) {
+        if (signal.aborted) return;
+        const project = currentProject();
+        if (!project) return;
+
+        let segments = [];
+        try {
+            const { ok, data } = await fetchJsonShared(
+                api, `/h3_lvm/segments?project=${encodeURIComponent(project)}`);
+            if (!ok) return;
+            segments = data.segments || [];
+        } catch (error) {
+            if (!signal.aborted) console.warn("[H3 LVM] deck panel could not load segments:", error);
+            return;
+        }
+        if (signal.aborted) return;
+        // The bin changed while this reply was on its way: the pending render will
+        // read the new bin, and its first-card reset must not be consumed here.
+        if (currentProject() !== project) return;
+
+        const ordered = [...segments]
+            .map(seg => ({ seg, id: Number(seg.segment_id) }))
+            .filter(item => Number.isFinite(item.id))
+            .sort((a, b) => a.id - b.id);
+        const present = new Set(ordered.map(item => item.id));
+        segmentCount = ordered.length;
+        availableIds = ordered.map(item => Number(item.seg.segment_id));
+        const segmentWidget = widgetFor(segmentField);
+        const selected = selectedSegment();
+        const selectFirst = selectFirstProject === project;
+        if (selectFirst) selectFirstProject = null;
+        if (segmentWidget && (selectFirst || deletedIds.has(selected))) {
+            const next = ordered[0]?.id ?? 1;
+            if (next !== selected) {
+                segmentWidget.value = next;
+                segmentWidget.callback?.(next);
+                node.setDirtyCanvas?.(true, true);
+            }
+        }
+        // Cards deleted in the Picker must lose their badge as well.
+        runIds = new Set([...runIds].filter(id => present.has(id)));
+        // A merge or a delete elsewhere can take a picked card away; drop it rather
+        // than offer a merge the server would refuse.
+        picked = new Set([...picked].filter(id => present.has(id)));
+        mergeBtn.title = ordered.length < 2
+            ? "至少需要两段才能合并"
+            : "点选相邻的卡片，再把它们合并成一个片段";
+        if (ordered.length < 2 && mergeMode) setMergeMode(false);
+        updateMergeUi();
+
+        const currentSel = selectedSegment();
+        const renderKey = JSON.stringify({
+            project,
+            segments: ordered.map(item => item.seg),
+            currentSel,
+            runIds: [...runIds].sort((a, b) => a - b),
+            picked: pickedIds(),
+            mergeMode,
+            merging,
+            deleting,
+        });
+        const rebuild = renderKey !== renderedDeckKey;
+
+        if (!ordered.length) {
+            if (rebuild) {
+                deck.innerHTML = '<div class="h3lvm-empty">' + emptyText + "</div>";
+                renderedDeckKey = renderKey;
+            }
+            updateStatus("空库");
+            return;
+        }
+
+        if (rebuild) {
+            deck.innerHTML = "";
+            for (const item of ordered) {
+                deck.appendChild(makeCard(item.seg, item.id === currentSel, runIds.has(item.id), picked.has(item.id), project));
+            }
+            renderedDeckKey = renderKey;
+        }
+        const runNote = runIds.size
+            ? ` · 本次生成 ${runIds.size} 段（片段 ${formatIds([...runIds])}）`
+            : "";
+        const mergeNote = mergeMode ? ` · 合并模式已选 ${picked.size} 段` : "";
+        updateStatus(`库内 ${ordered.length} 段${runNote}${mergeNote}`);
+    }
+
+    function makeCard(seg, active, fromRun, isPicked, project) {
+        const card = document.createElement("div");
+        const classes = ["h3lvm-card"];
+        if (active) classes.push("active");
+        if (isPicked) classes.push("picked");
+        card.className = classes.join(" ");
+        card.dataset.segId = String(seg.segment_id);
+        card.title = mergeMode
+            ? "把片段 " + seg.segment_id + " 加入/移出合并选择"
+            : "把片段 " + seg.segment_id + " 输出到下游";
+
+        const thumbWrap = document.createElement("div");
+        thumbWrap.className = "h3lvm-thumb-wrap";
+        appendThumbnail(thumbWrap, seg);
+        if (fromRun) {
+            const badge = document.createElement("span");
+            badge.className = "h3lvm-badge";
+            badge.textContent = "本次";
+            badge.title = "这个片段是本节点上一次运行保存的";
+            thumbWrap.appendChild(badge);
+        }
+        if (isPicked) {
+            const pickBadge = document.createElement("span");
+            pickBadge.className = "h3lvm-pick-badge";
+            pickBadge.textContent = "已选";
+            pickBadge.title = "已加入本次合并选择";
+            thumbWrap.appendChild(pickBadge);
+        }
+        if (seg.has_mp4 && seg.mp4_url) {
+            const playBtn = document.createElement("button");
+            playBtn.className = "h3lvm-play-btn";
+            playBtn.textContent = "▶";
+            playBtn.title = "预览视频";
+            playBtn.onclick = (event) => {
+                event.stopPropagation();
+                openPreview(seg, signal);
+            };
+            thumbWrap.appendChild(playBtn);
+        }
+        card.appendChild(thumbWrap);
+
+        const meta = document.createElement("div");
+        meta.className = "h3lvm-meta";
+        const seconds = seg.duration_sec != null ? seg.duration_sec.toFixed(2) + " 秒 · " : "";
+        const labelEl = document.createElement("div");
+        labelEl.className = "h3lvm-seg-label";
+        labelEl.textContent = "片段 " + seg.segment_id;
+        const infoEl = document.createElement("div");
+        infoEl.className = "h3lvm-seg-info";
+        infoEl.textContent = seg.frames + " 帧 · " + seconds + seg.width + "×" + seg.height;
+        meta.append(labelEl, infoEl);
+        const deleteBtn = addDeleteButton(meta, {
+            description: `项目「${project}」的片段 ${seg.segment_id}`,
+            signal,
+            onDelete: () => deleteCard(project, Number(seg.segment_id)),
+        });
+        deleteBtn.disabled = mergeMode || merging || deleting;
+        card.appendChild(meta);
+
+        card.onclick = () => {
+            if (merging || deleting) return;
+            if (mergeMode) {
+                togglePick(Number(seg.segment_id));
+                return;
+            }
+            const widget = widgetFor(segmentField);
+            if (widget) {
+                widget.value = seg.segment_id;
+                widget.callback?.(seg.segment_id);
+            }
+            // Reflect the choice locally; no refetch, the cards are already correct.
+            deck.querySelectorAll(".h3lvm-card").forEach(item => item.classList.remove("active"));
+            card.classList.add("active");
+            updateStatus(`已选片段 ${seg.segment_id}`);
+            node.setDirtyCanvas?.(true, true);
+        };
+        return card;
+    }
+
+    function onChanged(event) {
+        const data = event.detail || {};
+        const project = currentProject();
+        if (!project || data.project !== project) return;
+        if (Array.isArray(data.segments) && data.segments.length) {
+            runIds = new Set(data.segments.map(Number).filter(Number.isFinite));
+        }
+        void render(data.deleted_id);
+    }
+
+    api.addEventListener("h3_lvm/changed", onChanged);
+    signal.addEventListener("abort", () => api.removeEventListener("h3_lvm/changed", onChanged), { once: true });
+
+    return { render, toolbar, deck, footer, selectFirstSegment };
+}

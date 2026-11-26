@@ -1,0 +1,1618 @@
+/* H3 Long Video Manager — Segment Picker UI (Phase B2)
+   CSS prefix: .h3lvm-* (no conflict with clipstream .minimax-clip-*) */
+
+.h3lvm-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #e2e8f0;
+    user-select: none;
+    margin: 4px 0;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.h3lvm-parameter-panel {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #3a3a3a;
+    box-sizing: border-box;
+}
+
+.h3lvm-v2-leading {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.h3lvm-parameter-section {
+    overflow: hidden;
+    background: #191c23;
+    border: 1px solid #343a47;
+    border-radius: 7px;
+}
+
+.h3lvm-parameter-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 26px;
+    padding: 0 9px;
+    box-sizing: border-box;
+    color: #dbeafe;
+    background: #222834;
+    border-bottom: 1px solid #343a47;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.h3lvm-parameter-index {
+    color: #7dd3fc;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.h3lvm-parameter-fields {
+    padding: 3px 8px;
+}
+
+.h3lvm-parameter-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 30px;
+    min-width: 0;
+    box-sizing: border-box;
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.h3lvm-parameter-field + .h3lvm-parameter-field {
+    border-top: 1px solid rgba(71, 85, 105, 0.24);
+}
+
+.h3lvm-parameter-label {
+    flex: 0 0 44%;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.h3lvm-parameter-note {
+    color: #7b8798;
+    font-size: 10px;
+    font-weight: 400;
+}
+
+.h3lvm-parameter-select,
+.h3lvm-parameter-number {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 23px;
+    box-sizing: border-box;
+    padding: 2px 7px;
+    color: #e2e8f0;
+    background: #0f141d;
+    border: 1px solid #465163;
+    border-radius: 4px;
+    outline: none;
+    font-size: 12px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.h3lvm-parameter-select:hover,
+.h3lvm-parameter-number:hover {
+    border-color: #64748b;
+    background: #141b26;
+}
+
+.h3lvm-parameter-select:focus,
+.h3lvm-parameter-number:focus {
+    border-color: #60a5fa;
+    background: #111c2a;
+}
+
+.h3lvm-parameter-select:disabled,
+.h3lvm-parameter-number:disabled {
+    color: #758094;
+    background: #15181e;
+    border-color: #303642;
+    cursor: not-allowed;
+}
+
+.h3lvm-parameter-preset-number {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+}
+
+.h3lvm-parameter-switch {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    min-width: 76px;
+    padding: 2px 0 2px 8px;
+    color: #94a3b8;
+    background: transparent;
+    border: 0;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.h3lvm-parameter-track {
+    position: relative;
+    width: 32px;
+    height: 17px;
+    box-sizing: border-box;
+    background: #343b48;
+    border: 1px solid #515b6c;
+    border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.h3lvm-parameter-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 11px;
+    height: 11px;
+    background: #a7b0bf;
+    border-radius: 50%;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.h3lvm-parameter-switch:hover .h3lvm-parameter-track {
+    border-color: #7dd3fc;
+}
+
+.h3lvm-parameter-switch.is-on {
+    color: #bfdbfe;
+}
+
+.h3lvm-parameter-switch.is-on .h3lvm-parameter-track {
+    background: #2563eb;
+    border-color: #60a5fa;
+}
+
+.h3lvm-parameter-switch.is-on .h3lvm-parameter-thumb {
+    background: #eff6ff;
+    transform: translateX(15px);
+}
+
+.h3lvm-parameter-switch:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.h3lvm-parameter-field.is-disabled > .h3lvm-parameter-label {
+    color: #758094;
+}
+
+/* Row 1 - which bin is being read. Picking the wrong bin is the easiest mistake in
+   this workflow, so this row is the widest and brightest thing in the panel. */
+.h3lvm-project-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 8px;
+    background: #16202e;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.h3lvm-project-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #93c5fd;
+    white-space: nowrap;
+}
+
+/* Opens the current bin's folder on the host. It lives in the panel, not the popup,
+   because "where is this project on disk" is asked while working in the node. */
+.h3lvm-project-open {
+    flex: 0 0 auto;
+    height: clamp(28px, 1.8vw, 34px);
+    padding: 0 clamp(8px, .7vw, 12px);
+    color: #cbd5e1;
+    background: #20252d;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    font-size: clamp(11px, .5vw, 14px);
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.h3lvm-project-open:hover {
+    color: #fff;
+    background: #263244;
+    border-color: #60a5fa;
+}
+
+.h3lvm-project-open:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+
+.h3lvm-project-open:disabled {
+    opacity: .55;
+    cursor: default;
+}
+
+.h3lvm-project {
+    flex: 1 1 220px;
+    min-width: 180px;
+    background: #0f172a;
+    border: 1px solid #475569;
+    color: #f1f5f9;
+    border-radius: 5px;
+    font-size: 13px;
+    padding: 5px 8px;
+    cursor: pointer;
+}
+
+.h3lvm-project:focus {
+    outline: none;
+    border-color: #60a5fa;
+}
+
+/* How much the selected bin holds, so an empty bin is obvious before clicking. */
+.h3lvm-count {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.h3lvm-new-error {
+    font-size: 10px;
+    color: #fca5a5;
+    white-space: nowrap;
+}
+
+/* Confirm step for deleting a whole bin. The sentence names what is at stake, and
+   the destructive button keeps its own colour so it never reads like a normal one. */
+.h3lvm-danger-btn {
+    background: #7f1d1d;
+    border: 1px solid #b91c1c;
+    color: #fee2e2;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.h3lvm-danger-btn:hover {
+    background: #b91c1c;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.h3lvm-danger-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Row 2 - tools and the current selection, deliberately quieter than row 1. */
+.h3lvm-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+}
+
+.h3lvm-tool-sep {
+    width: 1px;
+    height: 16px;
+    background: #3a3a3a;
+}
+
+.h3lvm-tool-label {
+    font-size: 10px;
+    color: #64748b;
+}
+
+.h3lvm-spacer {
+    flex: 1 1 auto;
+}
+
+.h3lvm-status {
+    font-size: 11px;
+    font-weight: 500;
+    color: #93c5fd;
+}
+
+.h3lvm-refresh-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.h3lvm-refresh-btn:hover {
+    background: #334155;
+    color: #fff;
+    border-color: #60a5fa;
+    transform: scale(1.02);
+}
+
+/* The zoom control disables itself at 100% and 400% instead of wrapping around. */
+.h3lvm-refresh-btn:disabled {
+    opacity: .35;
+    cursor: default;
+    background: #1e293b;
+    color: #cbd5e1;
+    border-color: #475569;
+    transform: none;
+}
+
+.h3lvm-zoom-label {
+    font-size: 10px;
+    color: #94a3b8;
+    font-family: monospace;
+    min-width: 32px;
+    text-align: center;
+}
+
+/* Card deck: grid layout with CSS variables for zoom */
+.h3lvm-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 130px), 1fr));
+    grid-auto-rows: min-content;
+    gap: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 2px 10px 2px;
+    scroll-behavior: smooth;
+    align-content: start;
+}
+
+.h3lvm-deck::-webkit-scrollbar {
+    width: 6px;
+}
+.h3lvm-deck::-webkit-scrollbar-track {
+    background: #0f172a;
+    border-radius: 3px;
+}
+.h3lvm-deck::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+.h3lvm-deck::-webkit-scrollbar-thumb:hover {
+    background: #47569;
+}
+
+/* Individual card */
+.h3lvm-card {
+    position: relative;
+    background: #262626;
+    border: 2px solid #3a3a3a;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.h3lvm-card:hover {
+    border-color: #60a5fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.25);
+}
+
+.h3lvm-card.active {
+    border-color: #10b981;
+    background: #142823;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+}
+
+/* Merge mode. The buttons reuse .h3lvm-refresh-btn, so only the state colours
+   differ and the tool row keeps one height. */
+.h3lvm-merge-btn.on {
+    background: #7c2d12;
+    border-color: #f59e0b;
+    color: #fed7aa;
+}
+.h3lvm-merge-btn.on:hover {
+    background: #9a3412;
+    border-color: #fbbf24;
+    color: #ffedd5;
+}
+
+.h3lvm-merge-ok:not(:disabled) {
+    background: #14532d;
+    border-color: #10b981;
+    color: #d1fae5;
+}
+
+.h3lvm-card.picked {
+    border-color: #f59e0b;
+    background: #241a09;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.45);
+}
+
+.h3lvm-pick-badge {
+    position: absolute;
+    z-index: 3;
+    top: 4px;
+    right: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.92);
+    color: #241a09;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+/* Thumbnail */
+.h3lvm-thumb-wrap {
+    position: relative;
+    width: 100%;
+    height: var(--thumb-h, 75px);
+    overflow: hidden;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.h3lvm-thumb {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Portrait frames (9:16) are shown whole instead of cropped to a strip. The box -
+   and therefore the card - keeps exactly the same size; only the fit changes, and
+   the empty side space gets a blurred copy of the same frame instead of black. */
+.h3lvm-thumb.is-portrait {
+    object-fit: contain;
+}
+
+.h3lvm-thumb-bg {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: blur(10px) brightness(0.4) saturate(1.2);
+    transform: scale(1.25);
+    pointer-events: none;
+}
+
+.h3lvm-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #475569;
+}
+
+/* Active badge */
+.h3lvm-active-badge {
+    position: absolute;
+    z-index: 2;
+    top: 4px;
+    right: 4px;
+    background: #10b981;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    line-height: 1;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Play button (mp4 preview) */
+.h3lvm-play-btn {
+    position: absolute;
+    z-index: 2;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.h3lvm-play-btn:hover {
+    background: rgba(59, 130, 246, 0.9);
+    transform: scale(1.1);
+}
+
+/* Marked on the Manager panel: this node's last run, inside the same deck. */
+.h3lvm-badge {
+    position: absolute;
+    z-index: 2;
+    top: 4px;
+    left: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.92);
+    color: #04140d;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+/* Meta info */
+.h3lvm-meta {
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.h3lvm-seg-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.h3lvm-seg-info {
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+/* Footer */
+.h3lvm-footer {
+    border-top: 1px solid #333;
+    padding-top: 6px;
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+.h3lvm-hint {
+    font-size: 10px;
+    color: #64748b;
+}
+
+/* Empty state */
+.h3lvm-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 24px 12px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.h3lvm-empty-hint {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 6px;
+}
+
+/* Modal overlay (mp4 preview) */
+.h3lvm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.h3lvm-modal {
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+    padding: 16px;
+    max-width: 80vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.h3lvm-preview-video {
+    width: 100%;
+    max-height: 60vh;
+    border-radius: 6px;
+    background: #000;
+}
+
+.h3lvm-preview-info {
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.h3lvm-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.h3lvm-modal-close {
+    align-self: center;
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.h3lvm-modal-close:disabled {
+    opacity: .5;
+    cursor: wait;
+}
+
+.h3lvm-modal-close:hover {
+    background: #334155;
+    color: #fff;
+}
+
+/* RAFOLIE 2026-09-28: responsive DOM layout, scoped to this plugin. */
+.h3lvm-container { margin: 0; min-width: 0; min-height: 0; }
+.h3lvm-project-row, .h3lvm-toolbar { flex: 0 0 auto; }
+.h3lvm-deck { flex: 1 1 0; min-height: 0; min-width: 0;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min, 150px)), 1fr)); }
+.h3lvm-footer { flex: 0 0 auto; flex-wrap: wrap; overflow-wrap: anywhere; }
+.h3lvm-container img { max-width: 100%; }
+
+/* RAFOLIE: permanent-delete action stays in the card's lower-right corner. */
+.h3lvm-meta { position: relative; padding-right: 38px; min-height: 42px; }
+.h3lvm-meta > .h3-asset-delete {
+    position: absolute; right: 5px; bottom: 5px; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center; padding: 4px;
+    color: #cbd5e1; background: #20252d; border: 1px solid #475569;
+    border-radius: 5px; cursor: pointer;
+}
+.h3lvm-meta > .h3-asset-delete:hover { color: #fca5a5; border-color: #ef4444; background: #451a1a; }
+.h3lvm-meta > .h3-asset-delete:focus-visible { outline: 2px solid #f87171; outline-offset: 2px; }
+.h3lvm-meta > .h3-asset-delete:disabled { opacity: .45; cursor: wait; }
+
+/* ---------------------------------------------------------------------------
+   RAFOLIE 2026-10-19: the Segment Picker's two libraries.
+   An empty card list is usually the wrong mode rather than a missing file, so the
+   mode row is always visible and the current mode is always lit. */
+.h3lvm-mode-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.h3lvm-mode-btn {
+    flex: 1 1 150px;
+    min-width: 150px;
+    min-height: 36px;
+    background: #16202e;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.h3lvm-mode-btn:hover {
+    color: #e2e8f0;
+    border-color: #60a5fa;
+}
+
+.h3lvm-mode-btn.active {
+    background: #1d4ed8;
+    border-color: #60a5fa;
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.h3lvm-mode-btn.active:hover {
+    background: #2563eb;
+    border-color: #93c5fd;
+}
+
+/* One line of context per mode, in the same quiet tone as the footer hint. */
+.h3lvm-mode-hint {
+    flex: 1 1 100%;
+    font-size: 11.5px;
+    color: #94a3b8;
+    overflow-wrap: anywhere;
+}
+
+/* Upload mode: the import control is a normal tool button with a green accent. The
+   file input is never drawn - the button opens the browser dialog instead. */
+.h3lvm-upload-btn {
+    background: #14291d;
+    border-color: #14532d;
+    color: #bbf7d0;
+}
+
+.h3lvm-upload-btn:hover {
+    background: #166534;
+    border-color: #22c55e;
+    color: #ffffff;
+}
+
+.h3lvm-upload-btn[hidden] {
+    display: none;
+}
+
+.h3lvm-file-input {
+    display: none;
+}
+
+/* Only the card area takes files, so only the card area lights up. */
+.h3lvm-drop-zone {
+    outline: 1px dashed transparent;
+    outline-offset: -3px;
+}
+
+.h3lvm-drop-in {
+    outline: 1px dashed #60a5fa;
+    outline-offset: -3px;
+    background: rgba(37, 99, 235, 0.10);
+}
+
+/* Reordering the video library by dragging a card. The dragged card fades and the gap it
+   would land in is marked with a blue edge on the neighbour, which is how the reference
+   loaders show it too. The .h3lvm-card prefix is not decoration: that rule sets a
+   box-shadow on hover, and an unprefixed class would lose to it. */
+.h3lvm-card.h3lvm-dragging {
+    opacity: .35;
+    border-style: dashed;
+    cursor: grabbing;
+}
+
+.h3lvm-card.h3lvm-drop-before {
+    box-shadow: -4px 0 0 0 #60a5fa;
+}
+
+.h3lvm-card.h3lvm-drop-after {
+    box-shadow: 4px 0 0 0 #60a5fa;
+}
+
+/* The whole card is the handle, so the pointer should say so - except over the buttons,
+   which stay clicks. */
+.h3lvm-card[draggable="true"] {
+    cursor: grab;
+}
+
+.h3lvm-card[draggable="true"] .h3lvm-play-btn,
+.h3lvm-card[draggable="true"] .h3-asset-delete {
+    cursor: pointer;
+}
+
+/* Upload cards carry the original file name, which is long and must not push the
+   card wider than the grid cell. */
+.h3lvm-seg-name {
+    font-size: 10px;
+    color: #cbd5e1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Index entry without its file: the card stays, but it says so. */
+.h3lvm-missing-badge {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    background: #7f1d1d;
+    border: 1px solid #b91c1c;
+    color: #fee2e2;
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 1px 5px;
+}
+
+/* The mode row is fixed chrome; the deck keeps the flexible area. */
+.h3lvm-mode-row { flex: 0 0 auto; }
+
+/* --- Interaction states, one place for every button in this plugin ---
+   Three sheets grew three different hover recipes and two of them were no-ops, which is why
+   some buttons looked flat (the Guide editor's open button had no border at all: its colours
+   came from tokens scoped to the floating panel). These rules only add feedback - hover,
+   pressed, keyboard focus and the on-state of a toggle. Nothing here changes a box size,
+   which is the rule that keeps node cards from drifting when a control is clicked. */
+.h3lvm-primary {
+    background: #1e293b;
+    border: 1px solid #60a5fa;
+    color: #e2e8f0;
+}
+
+.h3lvm-primary:hover {
+    background: #334155;
+    border-color: #93c5fd;
+    color: #ffffff;
+}
+
+/* The editor is open: the button must say so, not just brighten. */
+.h3lvm-primary.on {
+    background: #14532d;
+    border-color: #10b981;
+    color: #d1fae5;
+}
+/* A state class and a :hover rule have the same specificity, so whichever comes last wins.
+   Every on/active state below is written after its :hover rule, which silently switched hover
+   off for exactly the controls a user is most likely to point at again. Each rule brightens
+   the selected colour instead of falling back to the neutral hover. */
+
+.h3lvm-primary.on:hover {
+    background: #166534;
+    border-color: #34d399;
+    color: #ecfdf5;
+}
+
+.h3lvm-refresh-btn:active,
+.h3lvm-primary:active,
+.h3lvm-danger-btn:active,
+.h3lvm-mode-btn:active,
+.h3lvm-merge-btn:active,
+.h3lvm-upload-btn:active,
+.h3lvm-modal-close:active,
+.h3lvm-play-btn:active { transform: scale(.97); }
+.h3lvm-meta > .h3-asset-delete:active { transform: scale(.97); }
+
+.h3lvm-refresh-btn:focus-visible,
+.h3lvm-primary:focus-visible,
+.h3lvm-danger-btn:focus-visible,
+.h3lvm-mode-btn:focus-visible,
+.h3lvm-merge-btn:focus-visible,
+.h3lvm-upload-btn:focus-visible,
+.h3lvm-modal-close:focus-visible,
+.h3lvm-play-btn:focus-visible,
+.h3lvm-project:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+
+.h3lvm-project:hover {
+    border-color: #60a5fa;
+    background: #14202f;
+}
+/* A select must not scale when pressed - it would move the whole project row. The
+   pressed state is a darker fill instead, which is the same signal the buttons give. */
+.h3lvm-project:active {
+    background: #1e293b;
+    border-color: #93c5fd;
+}
+
+/* ---------------------------------------------------------------------------
+   RAFOLIE 2026-11-02: project bin cards.
+   The current bin is a card, and the menu is a fixed grid popup so a cover
+   grid can be bigger than the node without being clipped by the DOM widget. */
+.h3lvm-project-label {
+    font-size: clamp(11px, 0.45vw, 14px);
+}
+
+.h3lvm-project-current {
+    flex: 1 1 260px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 8px;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    color: #f1f5f9;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: border-color .2s ease, background .2s ease;
+}
+
+.h3lvm-project-current:hover,
+.h3lvm-project-current:focus-visible {
+    background: #132033;
+    border-color: #60a5fa;
+    outline: none;
+}
+
+.h3lvm-project-current-cover {
+    width: clamp(52px, 2.6vw, 64px);
+    height: clamp(36px, 1.8vw, 44px);
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    background: #111827;
+}
+
+.h3lvm-project-current-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.h3lvm-project-current-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(12px, 0.5vw, 15px);
+    font-weight: 650;
+}
+
+.h3lvm-project-current-meta {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    color: #94a3b8;
+    font-size: clamp(9px, 0.35vw, 11px);
+    white-space: nowrap;
+}
+
+.h3lvm-project-updated {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.h3lvm-project-chevron {
+    flex: 0 0 auto;
+    color: #7dd3fc;
+    font-size: 12px;
+}
+
+.h3lvm-project-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #111827;
+}
+
+.h3lvm-project-cover img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.h3lvm-project-cover-icon {
+    color: #93c5fd;
+    font-size: 22px;
+    opacity: .85;
+}
+
+.h3lvm-project-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(3, 8, 20, .82);
+}
+
+.h3lvm-project-overlay[hidden] {
+    display: none;
+}
+
+.h3lvm-project-modal {
+    position: relative;
+    width: min(68vw, 1425px);
+    max-height: min(78vh, 1000px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #e2e8f0;
+    background: #151b26;
+    border: 1px solid #38445a;
+    border-radius: 10px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+    font-size: clamp(11px, 0.72vw, 14px);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.h3lvm-project-modal-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: clamp(9px, .6vw, 13px) clamp(10px, .8vw, 16px);
+    background: #1d2532;
+    border-bottom: 1px solid #38445a;
+}
+
+.h3lvm-project-modal-title {
+    color: #dbeafe;
+    font-size: clamp(12px, .85vw, 16px);
+    font-weight: 700;
+}
+
+.h3lvm-project-modal-count {
+    flex: 1 1 auto;
+    color: #94a3b8;
+    font-size: clamp(10px, .65vw, 13px);
+}
+
+.h3lvm-project-close {
+    width: clamp(24px, 1.4vw, 32px);
+    height: clamp(24px, 1.4vw, 32px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #cbd5e1;
+    background: #263244;
+    border: 1px solid #475569;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.h3lvm-project-close:hover {
+    color: #fff;
+    background: #334155;
+}
+
+.h3lvm-project-search-row {
+    --project-control-h: clamp(30px, 2vw, 40px);
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: clamp(8px, .6vw, 13px) clamp(10px, .8vw, 16px) 5px;
+}
+
+/* One box model for every toolbar control, so the row lines up to the pixel. */
+.h3lvm-project-search-row > *,
+.h3lvm-project-create > * {
+    box-sizing: border-box;
+}
+
+/* The one control that starts a new bin: primary colour, first in the row, and it
+   never shrinks. A narrow window wraps the search field under it instead of
+   squeezing the label onto two characters. */
+.h3lvm-project-new-btn {
+    flex: 0 0 auto;
+    height: var(--project-control-h);
+    padding: 0 clamp(12px, 1vw, 18px);
+    color: #ffffff;
+    background: #1d4ed8;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    font-size: clamp(14px, .8vw, 17px);
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+}
+
+.h3lvm-project-new-btn:hover {
+    background: #2563eb;
+    border-color: #93c5fd;
+}
+
+.h3lvm-project-new-btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+/* The name field and its two buttons are always in the toolbar row, right after the
+   button that focuses them. The buttons stay dim until the field holds a name.
+   display:contents keeps the three controls in the row's own flex flow, so the name
+   field and the search field can share the leftover width evenly. */
+.h3lvm-project-create {
+    display: contents;
+}
+
+.h3lvm-project-name {
+    flex: 1 1 0;
+    min-width: clamp(150px, 10vw, 200px);
+    height: calc(var(--project-control-h) * .95);
+    padding: 0 8px;
+    color: #e2e8f0;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 5px;
+    font-size: clamp(13px, .72vw, 16px);
+    user-select: text;
+}
+
+.h3lvm-project-name:focus {
+    outline: none;
+    border-color: #60a5fa;
+}
+
+.h3lvm-project-create-btn,
+.h3lvm-project-cancel-btn {
+    flex: 0 0 auto;
+    height: calc(var(--project-control-h) * .95);
+    padding: 0 clamp(10px, .8vw, 14px);
+    border-radius: 5px;
+    font-size: clamp(13px, .72vw, 16px);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+}
+
+.h3lvm-project-create-btn {
+    color: #ffffff;
+    background: #15803d;
+    border: 1px solid #22c55e;
+}
+
+.h3lvm-project-create-btn:hover {
+    background: #16a34a;
+    border-color: #4ade80;
+}
+
+/* Until the field holds a name there is nothing to confirm or cancel, so both
+   buttons read as unavailable instead of looking like live actions. */
+.h3lvm-project-create-btn:disabled,
+.h3lvm-project-cancel-btn:disabled {
+    color: #64748b;
+    background: #1e293b;
+    border-color: #334155;
+    opacity: .75;
+    cursor: default;
+}
+
+.h3lvm-project-cancel-btn {
+    color: #cbd5e1;
+    background: #1e293b;
+    border: 1px solid #475569;
+}
+
+.h3lvm-project-cancel-btn:hover {
+    color: #ffffff;
+    background: #334155;
+    border-color: #60a5fa;
+}
+
+/* A failure message stays in the row; it truncates instead of pushing the controls. */
+.h3lvm-project-error {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: clamp(120px, 12vw, 220px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #fca5a5;
+    font-size: clamp(11px, .62vw, 13px);
+}
+
+.h3lvm-project-search {
+    flex: 1 1 0;
+    min-width: clamp(150px, 10vw, 200px);
+    height: calc(var(--project-control-h) * .95);
+    padding: 0 8px;
+    color: #e2e8f0;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 5px;
+    font-size: clamp(13px, .72vw, 16px);
+    user-select: text;
+}
+
+.h3lvm-project-sort,
+.h3lvm-project-columns {
+    flex: 0 0 auto;
+    min-width: clamp(96px, 8vw, 118px);
+    height: calc(var(--project-control-h) * .95);
+    padding: 0 6px;
+    color: #e2e8f0;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 5px;
+    font-size: clamp(12px, .68vw, 15px);
+    cursor: pointer;
+}
+
+.h3lvm-project-columns {
+    min-width: clamp(64px, 5vw, 78px);
+}
+
+.h3lvm-project-sort-dir {
+    flex: 0 0 auto;
+    width: var(--project-control-h);
+    height: var(--project-control-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #cbd5e1;
+    background: #20252d;
+    border: 1px solid #475569;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: clamp(13px, .72vw, 16px);
+}
+
+.h3lvm-project-search:focus,
+.h3lvm-project-rename-input:focus {
+    outline: none;
+    border-color: #60a5fa;
+}
+
+.h3lvm-project-grid {
+    flex: 1 1 auto;
+    min-height: 96px;
+    display: grid;
+    grid-template-columns: repeat(var(--project-cols, 5), minmax(0, 1fr));
+    gap: 8px;
+    padding: clamp(7px, .6vw, 12px) clamp(10px, .8vw, 16px) 9px;
+    overflow: auto;
+}
+
+.h3lvm-project-tile {
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+    gap: clamp(7px, .5vw, 10px);
+    padding: clamp(7px, .5vw, 10px);
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+
+.h3lvm-project-tile:hover,
+.h3lvm-project-tile:focus-visible {
+    background: #132033;
+    border-color: #60a5fa;
+    outline: none;
+}
+
+.h3lvm-project-tile.active {
+    border-color: #3b82f6;
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .35);
+}
+
+.h3lvm-project-tile .h3lvm-project-cover {
+    width: clamp(56px, 3.4vw, 84px);
+    height: clamp(46px, 2.8vw, 62px);
+    flex: 0 0 auto;
+    border: 1px solid #334155;
+    border-radius: 6px;
+}
+
+.h3lvm-project-tile-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.h3lvm-project-tile-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f1f5f9;
+    font-size: clamp(11px, .75vw, 14px);
+    font-weight: 650;
+}
+
+.h3lvm-project-tile-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    color: #94a3b8;
+    font-size: clamp(9px, .6vw, 12px);
+    line-height: 1.2;
+}
+
+.h3lvm-project-tile-count {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.h3lvm-project-tile-time {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.h3lvm-project-actions,
+.h3lvm-project-rename-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: auto;
+}
+
+.h3lvm-project-action {
+    width: clamp(22px, 1.2vw, 28px);
+    height: clamp(20px, 1vw, 26px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #cbd5e1;
+    background: #20252d;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: clamp(10px, .6vw, 12px);
+}
+
+.h3lvm-project-action:hover {
+    color: #93c5fd;
+    border-color: #60a5fa;
+}
+
+.h3lvm-project-action[title*="删除"]:hover {
+    color: #fca5a5;
+    border-color: #ef4444;
+    background: #451a1a;
+}
+
+.h3lvm-project-rename-input {
+    width: 100%;
+    min-width: 0;
+    padding: 4px 7px;
+    color: #e2e8f0;
+    background: #0b1220;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    font-size: 12px;
+    user-select: text;
+}
+
+.h3lvm-project-empty {
+    grid-column: 1 / -1;
+    padding: 22px 8px;
+    color: #94a3b8;
+    text-align: center;
+    font-size: 12px;
+}
+
+.h3lvm-project-modal-hint {
+    flex: 0 0 auto;
+    padding: 7px 12px 9px;
+    color: #64748b;
+    border-top: 1px solid #263244;
+    font-size: 10px;
+}
+
+/* Delete confirmation: a centered card over the bin grid. The old version was a row
+   above the grid that pushed every tile down, so the sentence could scroll away. */
+.h3lvm-project-confirm {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10, 16, 27, .78);
+}
+
+.h3lvm-project-confirm[hidden] {
+    display: none;
+}
+
+.h3lvm-project-confirm-card {
+    width: min(560px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: clamp(14px, 1vw, 20px);
+    background: #1d2532;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+}
+
+.h3lvm-project-confirm-title {
+    color: #fecaca;
+    font-size: clamp(13px, .85vw, 16px);
+    font-weight: 700;
+}
+
+.h3lvm-project-confirm-text {
+    color: #cbd5e1;
+    font-size: clamp(11px, .72vw, 14px);
+    line-height: 1.5;
+}
+
+/* The shared error class is nowrap for one-line tiles; inside the card it has the
+   whole width and must wrap instead of running out of the overlay. */
+.h3lvm-project-confirm-card .h3lvm-new-error {
+    white-space: normal;
+    line-height: 1.4;
+}
+
+.h3lvm-project-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.h3lvm-project-confirm-actions .h3lvm-danger-btn,
+.h3lvm-project-confirm-actions .h3lvm-refresh-btn {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+   2026-11-04: in-node tool rows.
+   Deck, picker and reference panels use one card shell for their controls, so
+   刷新 / 卡片大小 / 状态 read as one toolbar instead of loose text. Scoped to
+   .h3-tool-card on purpose: the Guide node's fixed 112px strip keeps its own
+   compact geometry. */
+.h3-tool-card {
+    padding: 7px 9px;
+    background: #16202e;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    gap: 8px;
+}
+
+.h3lvm-toolbar.h3-tool-card {
+    margin-bottom: 8px;
+}
+
+.h3-tool-card .h3lvm-refresh-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.h3-tool-card .h3lvm-refresh-btn:disabled {
+    opacity: .45;
+    cursor: default;
+    transform: none;
+}
+
+.h3-tool-card .h3lvm-tool-label {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.h3-tool-card .h3lvm-status {
+    font-size: 12px;
+    color: #93c5fd;
+    font-weight: 600;
+}
+
+.h3-tool-card .h3lvm-zoom-label {
+    min-width: 44px;
+    font-size: 12px;
+    color: #cbd5e1;
+}
+
+.h3-tool-card .h3lvm-tool-sep {
+    height: 18px;
+    background: #3a4658;
+}
+
+.h3-tool-card .h3lvm-spacer {
+    flex: 1 1 auto;
+}
+
+/* Zoomed-down cards: keep the segment label on one line and drop the long
+   resolution line before it starts wrapping character by character. */
+.h3lvm-seg-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.h3lvm-seg-info {
+    min-width: 0;
+}
+
+.h3lvm-container.h3lvm-zoom-compact .h3lvm-seg-info {
+    display: none;
+}
+
+.h3lvm-container.h3lvm-zoom-compact .h3lvm-meta {
+    padding: 4px 6px;
+    padding-right: 28px;
+    min-height: 28px;
+}
+
+.h3lvm-container.h3lvm-zoom-compact .h3lvm-meta > .h3-asset-delete {
+    width: 22px;
+    height: 22px;
+    padding: 2px;
+    right: 3px;
+    bottom: 3px;
+}
+
+.h3lvm-container.h3lvm-zoom-tiny .h3lvm-meta {
+    padding: 3px 4px;
+    padding-right: 20px;
+    min-height: 0;
+}
+
+.h3lvm-container.h3lvm-zoom-tiny .h3lvm-seg-label {
+    font-size: 9px;
+}
+
+.h3lvm-container.h3lvm-zoom-tiny .h3lvm-meta > .h3-asset-delete {
+    width: 18px;
+    height: 18px;
+    padding: 2px;
+    right: 2px;
+    bottom: 2px;
+}
+
+@media (max-width: 640px) {
+    .h3lvm-project-overlay { padding: 10px; }
+    .h3lvm-project-modal { width: calc(100vw - 20px); max-height: 86vh; }
+    .h3lvm-project-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .h3lvm-project-current-cover { width: 44px; height: 32px; }
+}
