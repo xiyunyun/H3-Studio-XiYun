@@ -119,4 +119,10 @@ node --test tests/studio/studio_state.test.mjs
 
 ## 📜 开源协议与致谢
 
-本项目整合了来自 [ComfyUI-H3-Motion-Context](https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context)（GPLv3）、[ComfyUI-MiniMaxH3-PrefixStream](https://github.com/knoic/ComfyUI-MiniMaxH3-PrefixStream)（MIT）、`ComfyUI-H3-ClipStream` 与 `H3-Long-Video-Manager` 的开源成果，整体遵循 **GNU General Public License v3.0 (GPLv3)** 协议发布。详见 [LICENSE](./LICENSE) 与 [ATTRIBUTION.md](./ATTRIBUTION.md)。
+本项目初始节点与核心资产库继承并二次重构自 **AraneaQwQ** 的两个优秀开源项目：
+- [AraneaQwQ/H3-Long-Video-Manager](https://github.com/AraneaQwQ/H3-Long-Video-Manager)（MIT）
+- [AraneaQwQ/ComfyUI-H3-ClipStream](https://github.com/AraneaQwQ/ComfyUI-H3-ClipStream)（GPLv3）
+
+同时致谢其整合的上游开源项目：[NikoDemon80/ComfyUI-H3-Motion-Context](https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context)（GPLv3）与 [knoic/ComfyUI-MiniMaxH3-PrefixStream](https://github.com/knoic/ComfyUI-MiniMaxH3-PrefixStream)（MIT）。
+
+本项目整体遵循 **GNU General Public License v3.0 (GPLv3)** 协议发布，详见 [LICENSE](./LICENSE) 与 [ATTRIBUTION.md](./ATTRIBUTION.md)。

@@ -15,14 +15,16 @@ Because GPLv3-licensed code is incorporated into this combined work, the reposit
   - 2+2 Studio frontend workbenches, drag-and-drop reordering, media combo snapshots, and full bilingual parameter labels
 
 ## 2. Long Video Manager, Reference Loaders & Guide Timeline (`lvm/`, `web/lvm/`)
-- **Source**: `H3-Long-Video-Manager-Xiyun` (MIT License)
+- **Upstream**: [AraneaQwQ/H3-Long-Video-Manager](https://github.com/AraneaQwQ/H3-Long-Video-Manager)
+- **Author**: **AraneaQwQ**
+- **License**: **MIT**
 - **Included modules**: Long Video Manager / v2, Smart Split / v2, Segment Picker, Image & Audio Reference Loaders, Guide Timeline / v2 / v2 B / Keyframe Release, Video Compare Slider, and `/h3_lvm/*` API routes.
 
 ## 3. ClipStream — Motion-Context & Clip Bin (`clipstream/`, `web/clipstream/`)
-- **Source**: `ComfyUI-H3-ClipStream-Xiyun` (GPLv3), combining:
+- **Upstream**: [AraneaQwQ/ComfyUI-H3-ClipStream](https://github.com/AraneaQwQ/ComfyUI-H3-ClipStream)
+- **Author**: **AraneaQwQ** (**GPLv3**), combining:
+  - **Dual Saver / Dual Picker & Long Builder**: Original work by **AraneaQwQ**
   - **Motion-Context continuation engine** (`clipstream/motion_context/`):
     - Upstream: [NikoDemon80/ComfyUI-H3-Motion-Context](https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context) by **NikoDemon80** (**GPLv3**)
   - **Clip Bin visual media pool** (`clipstream/clipbin/`):
     - Upstream: [knoic/ComfyUI-MiniMaxH3-PrefixStream](https://github.com/knoic/ComfyUI-MiniMaxH3-PrefixStream) by **knoic** (**MIT**)
-  - **Dual Saver / Dual Picker & Long Builder**:
-    - Original work by **AraneaQwQ** (from `ComfyUI-H3-ClipStream`)
